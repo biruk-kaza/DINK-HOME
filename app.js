@@ -128,24 +128,22 @@ app.use((req, res) => {
     res.status(404).send(`Oops! Dink Home doesn't have a page at ${req.url}.`);
 });
 
-// Database sync during initialization (important for Vercel/Serverless)
-sequelize.sync({ alter: false })
-    .then(() => {
-        console.log('✅ Database synced successfully');
-    })
-    .catch(err => {
-        console.error('❌ Database sync failed:', err);
-    });
-
-// Export app for Vercel
-module.exports = app;
-
-// Server startup (only if running directly)
+// --- DATABASE SYNC ---
+// We sync once locally. In production (Vercel), we don't sync on every request 
+// to avoid timeouts and performance hits.
 if (require.main === module) {
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-        console.log(`✅ Server running at http://localhost:${PORT}`);
-        console.log(`📝 Register at: http://localhost:${PORT}/auth/register`);
-        console.log(`🔐 Login at: http://localhost:${PORT}/auth/login`);
-    });
+    sequelize.sync({ alter: false })
+        .then(() => {
+            console.log('✅ Database synced successfully');
+            const PORT = process.env.PORT || 3000;
+            app.listen(PORT, () => {
+                console.log(`✅ Server running at http://localhost:${PORT}`);
+            });
+        })
+        .catch(err => {
+            console.error('❌ Database sync failed:', err);
+        });
 }
+
+// Export for Vercel
+module.exports = app;
