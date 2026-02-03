@@ -9,7 +9,6 @@ const sequelize = require('./config/database');
 const User = require('./models/User');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // View engine
 app.set('view engine', 'ejs');
@@ -48,12 +47,16 @@ app.use((req, res, next) => {
 const getAllData = () => {
     try {
         const filePath = path.join(__dirname, 'data', 'products.json');
+        if (!fs.existsSync(filePath)) {
+            console.warn("WARNING: products.json not found");
+            return { products: [], categories: [] };
+        }
         const raw = fs.readFileSync(filePath, 'utf8');
         const products = JSON.parse(raw);
         const categories = [...new Set(products.map(p => p.category))];
         return { products, categories };
     } catch (err) {
-        console.error("CRITICAL DATA ERROR:", err.message);
+        console.error("DATA FETCHING ERROR:", err.message);
         return { products: [], categories: [] };
     }
 };
@@ -124,22 +127,24 @@ app.use((req, res) => {
     res.status(404).send(`Oops! Dink Home doesn't have a page at ${req.url}.`);
 });
 
-// Database sync and server startup
+// Database sync during initialization (important for Vercel/Serverless)
+sequelize.sync({ alter: false })
+    .then(() => {
+        console.log('✅ Database synced successfully');
+    })
+    .catch(err => {
+        console.error('❌ Database sync failed:', err);
+    });
+
 // Export app for Vercel
 module.exports = app;
 
-// Database sync and server startup (only if running directly)
+// Server startup (only if running directly)
 if (require.main === module) {
-    sequelize.sync({ alter: true })
-        .then(() => {
-            console.log('✅ Database synced successfully');
-            app.listen(PORT, () => {
-                console.log(`✅ Server running at http://localhost:${PORT}`);
-                console.log(`📝 Register at: http://localhost:${PORT}/auth/register`);
-                console.log(`🔐 Login at: http://localhost:${PORT}/auth/login`);
-            });
-        })
-        .catch(err => {
-            console.error('❌ Database sync failed:', err);
-        });
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`✅ Server running at http://localhost:${PORT}`);
+        console.log(`📝 Register at: http://localhost:${PORT}/auth/register`);
+        console.log(`🔐 Login at: http://localhost:${PORT}/auth/login`);
+    });
 }
